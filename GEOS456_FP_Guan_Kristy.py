@@ -9,9 +9,16 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
+
+
 # Import all required modules
 import arcpy, os, sys
 from arcpy.sa import *
+
+import time # Import time module
+start = time.time() # Record start time. reference: https://www.geeksforgeeks.org/how-to-check-the-execution-time-of-python-script/
+print("Start of script.\n")
+
 
 # Set the overwrite outputs environment
 arcpy.env.overwriteOutput = True #allow overwriting files, default is False
@@ -85,45 +92,45 @@ def saveToGDB(in_path, out_path, out_cs):
         setCSAndSaveToGDB(fc, out_path, out_cs)
 
 
-# Function to check and set coordinate system
-# in_feature is the input feature name
-# out_path is the desired output path
-# out_cs is the desired output coordinate system
-def setCSAndSaveToGDB(in_feature, out_path, out_cs):
-
-
-    print("in setCS, in feature: ", in_feature)
-
-    sr = arcpy.Describe(in_feature).spatialReference
-
-    # set name
-    name = setName(in_feature)
-
-    # Check Coordinate system
-    if sr == out_cs:
-        print(f"{in_feature} is already set in {out_cs.name}...")
-        print(f"Saving to gdb...")
-        arcpy.FeatureClassToFeatureClass_conversion(in_feature, out_path, name)
-        messages()
-        return
-    elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
-        print(f"{in_feature} has unknown spatial reference, exiting...")
-        exit()
-
-    print(f"{in_feature} is in {sr.name}, projecting to {out_cs.name}...")
-    arcpy.Project_management(in_feature, os.path.join(out_path, name), out_cs)
-    messages()
-
-
-# Function to clean up file names
-# It will remove the file extension and leading digits from the filename
-def setName(name):
-    # extract file name without file extension
-    name = os.path.splitext(name)[0]
-    # remove digits at beginning of name
-    if name[0].isdigit():
-        name = name.split("_", 1)[1]
-    return name
+### Function to check and set coordinate system
+### in_feature is the input feature name
+### out_path is the desired output path
+### out_cs is the desired output coordinate system
+##def setCSAndSaveToGDB(in_feature, out_path, out_cs):
+##
+##
+##    print("in setCS, in feature: ", in_feature)
+##
+##    sr = arcpy.Describe(in_feature).spatialReference
+##
+##    # set name
+##    name = setName(in_feature)
+##
+##    # Check Coordinate system
+##    if sr == out_cs:
+##        print(f"{in_feature} is already set in {out_cs.name}...")
+##        print(f"Saving to gdb...")
+##        arcpy.FeatureClassToFeatureClass_conversion(in_feature, out_path, name)
+##        messages()
+##        return
+##    elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
+##        print(f"{in_feature} has unknown spatial reference, exiting...")
+##        exit()
+##
+##    print(f"{in_feature} is in {sr.name}, projecting to {out_cs.name}...")
+##    arcpy.Project_management(in_feature, os.path.join(out_path, name), out_cs)
+##    messages()
+##
+##
+### Function to clean up file names
+### It will remove the file extension and leading digits from the filename
+##def setName(name):
+##    # extract file name without file extension
+##    name = os.path.splitext(name)[0]
+##    # remove digits at beginning of name
+##    if name[0].isdigit():
+##        name = name.split("_", 1)[1]
+##    return name
 
 
 #-------------------------------------------------------------------------------
@@ -195,51 +202,74 @@ print(f"\n{'- - '*20}\n") # print separator line
 for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureClass", "RasterDataset"]):
     arcpy.env.workspace = dirpath
 
+    if dirpath.endswith(".gdb"):
+        continue #skips this directory
+
 
     for filename in filenames:
-        print(f"dirpath {dirpath}")
-        print(f"\tfilename {filename}")
+        print(f"dirpath: {dirpath}")
+        print(f"\tfilename: {filename}")
 
         if filename.lower().endswith(".shp"):  # Check if it's a shapefile
 
             print("\t\t Shapefile", os.path.join(dirpath, filename))
 
-            name = os.path.splitext(filename)[0]
-            print(f"\t\t basename {name}")
-
-
-
-            sr = arcpy.Describe(filename).spatialReference
-
-            # set name
-            name = setName(filename)
-
-            # Check Coordinate system
-            if sr == out_cs:
-                print(f"{filename} is already set in {out_cs.name}...")
-                print(f"Saving to gdb...")
-                arcpy.FeatureClassToFeatureClass_conversion(filename, scratch_path, name)
-                messages()
-
-            elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
-                print(f"{filename} has unknown spatial reference, exiting...")
-                exit()
-
-##            print(f"{filename} is in {sr.name}, projecting to {out_cs.name}...")
-##            arcpy.Project_management(os.path.join(dirpath, filename), os.path.join(scratch_path, name), out_cs)
-##            messages()
+##            name = os.path.splitext(filename)[0]
+##
+##            sr = arcpy.Describe(filename).spatialReference
+##
+##
+##
+##            # Check Coordinate system
+##            if sr == out_cs:
+##                print(f"{filename} is already set in {out_cs.name}...")
+##                print(f"Saving to gdb...")
+##                arcpy.FeatureClassToFeatureClass_conversion(filename, scratch_path, name)
+##                messages()
+##            elif sr.name == "Unknown":
+##                print(f"{filename} has unknown spatial reference, exiting...")
+##                exit() #end the program
+##            else:
+##                print(f"{filename} is in {sr.name}, projecting to {out_cs.name}...")
+##                arcpy.Project_management(os.path.join(dirpath, filename), os.path.join(scratch_path, name), out_cs)
+##                messages()
+##
 ##
 ##            print(f"Clipping to the boundary... ")
 ##            arcpy.analysis.Clip(in_features=os.path.join(scratch_path, name), clip_features=study_area, out_feature_class=os.path.join(out_path, name))
 ##            messages()
 
+        elif filename.lower().endswith(".bnd"):
+            rasters = arcpy.ListRasters()
+            for raster in rasters:
+                print("Saving raster to scratch...")
+                arcpy.conversion.RasterToOtherFormat(Input_Rasters=os.path.join(dirpath, raster), Output_Workspace=scratch_path)
+                messages()
+
+                print("Projecting raster...")
+                out_raster_path = os.path.join(scratch_path, f"{raster}_projected")
+                arcpy.management.ProjectRaster(in_raster=os.path.join(scratch_path, raster),
+                                              out_raster=out_raster_path,
+                                              out_coor_system=out_cs,
+                                              cell_size=cell)
+
+                print("Extract by Mask with park boundary...")
+                out_extract = ExtractByMask(in_raster=out_raster_path, in_mask_data=study_area)
+                messages()
+
+                print(f"Saving raster to {out_gdb}...")
+                out_extract.save(os.path.join(out_path, raster))
+                messages()
+        else:
+            print("\t\t else: hi, how ya doin'? '")
+
+## arcpy.conversion.RasterToOtherFormat(Input_Rasters=os.path.join(dirpath, raster), Output_Workspace=scratch_path, "GRID")
+##
+## arcpy.management.ProjectRaster(in_raster=os.path.join(dirpath, raster), out_raster=os.path.join(scratch_path, raster), out_coor_system=out_cs)
 
 
-
-
-
-##        elif filename.lower().endswith(".bnd"): # Check if it's a bnd raster
-##            print("\t\t BND")
+##        else:
+##            print("\t\t Not Shapefile")
 ##
 ##            rasters = arcpy.ListRasters()
 ##            for raster in rasters:
@@ -247,25 +277,6 @@ for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureC
 ##
 ##            name = os.path.basename(filename)
 ##            print(f"\t\t basename {name}")
-
-##            print("\t\t\t in raster", os.path.join(dirpath, filename))
-##            print("\t\t\t out raster", os.path.join(scratch_path, name))
-##            print("\t\t\t out cs", out_cs)
-
-##            arcpy.conversion.RasterToOtherFormat(Input_Rasters=os.path.join(dirpath, filename), Output_Workspace=scratch_path, "GRID")
-
-##            arcpy.management.ProjectRaster(in_raster=os.path.join(dirpath, filename), out_raster=os.path.join(scratch_path, "ab_raster"), out_coor_system=out_cs)
-
-
-        else:
-            print("\t\t Not Shapefile")
-
-            rasters = arcpy.ListRasters()
-            for raster in rasters:
-                print("raster here", raster)
-
-            name = os.path.basename(filename)
-            print(f"\t\t basename {name}")
 
         print()
 
@@ -302,5 +313,12 @@ for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureC
 
 # Check in the extension
 arcpy.CheckInExtension("Spatial")
+
+#-------------------------------------------------------------------------------
+# Record end time
+end = time.time()
+
+# Print the difference between start and end time in seconds
+print(f"The time to execute the script was {round(end-start, 2)} seconds!")
 
 print("\nEnd of script.")
