@@ -81,38 +81,38 @@ def saveToGDB(in_path, out_path, out_cs):
     # List of the RAW data (shapefiles)
     fcList = arcpy.ListFeatureClasses()
 
-##    setCSAndSaveToGDB(fc, out_path, out_cs)
+    for fc in fcList:
+        setCSAndSaveToGDB(fc, out_path, out_cs)
 
 
-### Function to check and set coordinate system
-### in_feature is the input feature name
-### out_path is the desired output path
-### out_cs is the desired output coordinate system
-##def setCSAndSaveToGDB(in_feature, out_path, out_cs):
-##
-##    geom_typ = arcpy.Describe(in_feature).shapeType
-##    sr = arcpy.Describe(in_feature).spatialReference
-##
-##    # set name
-##    if "Point" in in_feature: #fix name of GPS Point
-##        name = "GPS_Point"
-##    else:
-##        name = setName(in_feature)
-##
-##    # Check Coordinate system
-##    if sr == out_cs:
-##        print(f"{in_feature} is already set in {out_cs.name}...")
-##        print(f"Saving to gdb...")
-##        arcpy.FeatureClassToFeatureClass_conversion(in_feature, out_path, name)
-##        messages()
-##        return
-##    elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
-##        print(f"{in_feature} has unknown spatial reference, exiting...")
-##        exit()
-##
-##    print(f"{in_feature} is in {sr.name}, projecting to {out_cs.name}...")
-##    arcpy.Project_management(in_feature, os.path.join(out_path, name), out_cs)
-##    messages()
+# Function to check and set coordinate system
+# in_feature is the input feature name
+# out_path is the desired output path
+# out_cs is the desired output coordinate system
+def setCSAndSaveToGDB(in_feature, out_path, out_cs):
+
+
+    print("in setCS, in feature: ", in_feature)
+
+    sr = arcpy.Describe(in_feature).spatialReference
+
+    # set name
+    name = setName(in_feature)
+
+    # Check Coordinate system
+    if sr == out_cs:
+        print(f"{in_feature} is already set in {out_cs.name}...")
+        print(f"Saving to gdb...")
+        arcpy.FeatureClassToFeatureClass_conversion(in_feature, out_path, name)
+        messages()
+        return
+    elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
+        print(f"{in_feature} has unknown spatial reference, exiting...")
+        exit()
+
+    print(f"{in_feature} is in {sr.name}, projecting to {out_cs.name}...")
+    arcpy.Project_management(in_feature, os.path.join(out_path, name), out_cs)
+    messages()
 
 
 # Function to clean up file names
@@ -146,6 +146,10 @@ wildlife = "Wildlife"
 
 
 
+study_area = r"C:\GEOS456\FinalProject\Kananaskis\KCountry_Bound.shp"
+
+
+
 
 # Output geodatabase and path for final data
 out_gdb = "KananaskisWildlife.gdb" #required name
@@ -157,6 +161,8 @@ scratch_path = os.path.join(root_path, scratch_gdb)
 
 # Output coordinate system
 out_cs = arcpy.SpatialReference("NAD 1983 UTM Zone 11N")
+##out_cs = arcpy.SpatialReference("NAD_1983_UTM_Zone_11N")
+
 
 # Raster cell size (required)
 cell = 25 # in meters
@@ -173,6 +179,8 @@ checkExistandDelete(root_path, scratch_gdb)
 createGDBandDatasets(root_path, out_gdb, "", out_cs) # gdb for final outputs
 createGDBandDatasets(root_path, scratch_gdb, "", out_cs) # gdb for intermediate data
 
+print(f"\n{'- - '*20}\n") # print separator line
+
 
 # Convert/project all data and store in gdb (From root folder to Scratch gdb)
 ##saveToGDB(in_path=root_path, out_path=scratch_path, out_cs=out_cs)
@@ -183,72 +191,87 @@ createGDBandDatasets(root_path, scratch_gdb, "", out_cs) # gdb for intermediate 
 
 
 
-### List of all FC (shapefile)
-##for dirpath, dirnames, filenames in os.walk(root_path): # reference: https://docs.python.org/3/library/os.html
-##    arcpy.env.workspace = dirpath
-##
-##    fcList = arcpy.ListFeatureClasses()
-##
-##    print(f"List of feature classes from {dirpath}:")
-##    for fc in fcList:
-##        print("\t", fc) #prints one feature class from the list
-##
-##        # Describe data type, geometry, and spatial reference of each shapefile
-##        fcDesc = arcpy.Describe(fc)
-##        print(f"\t\t Data Type: {fcDesc.dataType}")
-##        print(f"\t\t Geometry: {fcDesc.shapeType}")
-##        print(f"\t\t Spatial Reference: {fcDesc.spatialReference.name}")
-##        print()
+
+for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureClass", "RasterDataset"]):
+    arcpy.env.workspace = dirpath
 
 
-### Use Walk to iterate through the directory structure
-##for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype="FeatureClass"):
-##    arcpy.env.workspace = dirpath
-##
-##    fcList = arcpy.ListFeatureClasses()
-##
-##    print(f"List of feature classes from {dirpath}:")
-##    for fc in fcList:
-##        print("\tFC", fc) #prints one feature class from the list
-##
-##        geom_typ = arcpy.Describe(in_feature).shapeType
-##        sr = arcpy.Describe(in_feature).spatialReference
-##
-##        # Check Coordinate system
-##        if sr == out_cs:
-##            print(f"{fc} is already set in {out_cs.name}...")
-##            print(f"Saving to gdb...")
-##            arcpy.conversion.FeatureClassToFeatureClass(in_features=os.path.join(dirpath, filename), out_path=scratch_path, out_name=fc)
+    for filename in filenames:
+        print(f"dirpath {dirpath}")
+        print(f"\tfilename {filename}")
+
+        if filename.lower().endswith(".shp"):  # Check if it's a shapefile
+
+            print("\t\t Shapefile", os.path.join(dirpath, filename))
+
+            name = os.path.splitext(filename)[0]
+            print(f"\t\t basename {name}")
+
+
+
+            sr = arcpy.Describe(filename).spatialReference
+
+            # set name
+            name = setName(filename)
+
+            # Check Coordinate system
+            if sr == out_cs:
+                print(f"{filename} is already set in {out_cs.name}...")
+                print(f"Saving to gdb...")
+                arcpy.FeatureClassToFeatureClass_conversion(filename, scratch_path, name)
+                messages()
+
+            elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
+                print(f"{filename} has unknown spatial reference, exiting...")
+                exit()
+
+##            print(f"{filename} is in {sr.name}, projecting to {out_cs.name}...")
+##            arcpy.Project_management(os.path.join(dirpath, filename), os.path.join(scratch_path, name), out_cs)
 ##            messages()
-##            return
-##        elif sr.name == "Unknown": # reference: https://pro.arcgis.com/en/pro-app/latest/arcpy/classes/spatialreference.htm
-##            print(f"{in_feature} has unknown spatial reference, exiting...")
-##            exit()
 ##
-##        arcpy.management.Project(in_dataset, out_dataset, out_coor_system=out_cs)
-##        messages()
+##            print(f"Clipping to the boundary... ")
+##            arcpy.analysis.Clip(in_features=os.path.join(scratch_path, name), clip_features=study_area, out_feature_class=os.path.join(out_path, name))
+##            messages()
 
 
 
 
 
-##    print(f"dirpath {dirpath} \n\tdirname {dirnames}\n")
-##    for filename in filenames:
-##        print("\tfilename", filename, "\n")
+
+##        elif filename.lower().endswith(".bnd"): # Check if it's a bnd raster
+##            print("\t\t BND")
 ##
+##            rasters = arcpy.ListRasters()
+##            for raster in rasters:
+##                print("raster here", raster)
 ##
-##        fc_path = os.path.join(dirpath, filename)
-##        desc = arcpy.da.Describe(fc_path)
-##        print("desc", desc)
-##
-##        if desc['shapeType'] == ("Polygon" or "Polyline"):
-##            print(f"{fc_path} is a {desc.shapeType} feature class.")
-##        else:
-##            print(f"{fc_path} is not a Polygon or Polyline feature class. ----------------------------------")
-##
-##        arcpy.conversion.FeatureClassToFeatureClass(in_features=os.path.join(dirpath, filename), out_path=scratch_path, out_name=filename)
-##        arcpy.FeatureClassToFeatureClass_conversion(in_feature, out_path, name)
-##        arcpy.analysis.Clip(in_features=filename, clip_features="Bear_Habitat", out_feature_class=save_path)
+##            name = os.path.basename(filename)
+##            print(f"\t\t basename {name}")
+
+##            print("\t\t\t in raster", os.path.join(dirpath, filename))
+##            print("\t\t\t out raster", os.path.join(scratch_path, name))
+##            print("\t\t\t out cs", out_cs)
+
+##            arcpy.conversion.RasterToOtherFormat(Input_Rasters=os.path.join(dirpath, filename), Output_Workspace=scratch_path, "GRID")
+
+##            arcpy.management.ProjectRaster(in_raster=os.path.join(dirpath, filename), out_raster=os.path.join(scratch_path, "ab_raster"), out_coor_system=out_cs)
+
+
+        else:
+            print("\t\t Not Shapefile")
+
+            rasters = arcpy.ListRasters()
+            for raster in rasters:
+                print("raster here", raster)
+
+            name = os.path.basename(filename)
+            print(f"\t\t basename {name}")
+
+        print()
+
+
+
+
 
 
 
