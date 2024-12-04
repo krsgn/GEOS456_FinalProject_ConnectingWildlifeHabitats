@@ -14,6 +14,7 @@
 # Import all required modules
 import arcpy, os, sys
 from arcpy.sa import *
+import arcpy.mp as MAP
 
 import time # Import time module
 start = time.time() # Record start time. reference: https://www.geeksforgeeks.org/how-to-check-the-execution-time-of-python-script/
@@ -32,9 +33,10 @@ arcpy.CheckOutExtension("Spatial")
 
 # Function to print out the first and last message from a Function Tool
 def messages():
-    print(arcpy.GetMessages(0)) # print first message of tool
+    print(arcpy.GetMessage(0)) # print first message of tool
     count = (arcpy.GetMessageCount())
-    print(arcpy.GetMessages(count-1)) # print last message of tool
+    print(arcpy.GetMessage(count-1)) # print last message of tool
+    print()
 
 
 # Function to check for the existence of the gdb and to delete it
@@ -140,21 +142,8 @@ def saveToGDB(in_path, out_path, out_cs):
 # Path to required data location
 root_path = r"C:\GEOS456\FinalProject"
 
-# Name of folders containing fc
-##folders = ["Base", "DLS"]
-##folders_path = [os.path.join(root_path,folders[0]), os.path.join(root_path,folders[1])]
-
-ats = "ATS"
-dem = "DEM"
-kananaskis = "Kananaskis"
-landcover = "Landcover"
-nts = "NTS"
-wildlife = "Wildlife"
-
-
 
 study_area = r"C:\GEOS456\FinalProject\Kananaskis\KCountry_Bound.shp"
-
 
 
 
@@ -168,7 +157,7 @@ scratch_path = os.path.join(root_path, scratch_gdb)
 
 # Output coordinate system
 out_cs = arcpy.SpatialReference("NAD 1983 UTM Zone 11N")
-##out_cs = arcpy.SpatialReference("NAD_1983_UTM_Zone_11N")
+
 
 
 # Raster cell size (required)
@@ -178,10 +167,6 @@ cell = 25 # in meters
 #-------------------------------------------------------------------------------
 arcpy.env.workspace = root_path
 
-# Delete existing geodatabases
-checkExistandDelete(root_path, out_gdb)
-checkExistandDelete(root_path, scratch_gdb)
-
 # Create GDB and datasets (will check for and delete existing gdb if necessary)
 createGDBandDatasets(root_path, out_gdb, "", out_cs) # gdb for final outputs
 createGDBandDatasets(root_path, scratch_gdb, "", out_cs) # gdb for intermediate data
@@ -189,16 +174,7 @@ createGDBandDatasets(root_path, scratch_gdb, "", out_cs) # gdb for intermediate 
 print(f"\n{'- - '*20}\n") # print separator line
 
 
-# Convert/project all data and store in gdb (From root folder to Scratch gdb)
-##saveToGDB(in_path=root_path, out_path=scratch_path, out_cs=out_cs)
-### From Base folder to Scratch gdb
-##saveToGDB(in_path=folders_path[0], out_path=os.path.join(scratch_path, folders[0]), out_cs=out_cs)
-### From DLS folder to Scratch gdb
-##saveToGDB(in_path=folders_path[1], out_path=os.path.join(scratch_path, folders[1]), out_cs=out_cs)
-
-
-
-
+# Convert/project all data and store in gdb (From root folder to Scratch gdb to Output gdb)
 for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureClass", "RasterDataset"]):
     arcpy.env.workspace = dirpath
 
@@ -214,30 +190,26 @@ for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureC
 
             print("\t\t Shapefile", os.path.join(dirpath, filename))
 
-##            name = os.path.splitext(filename)[0]
-##
-##            sr = arcpy.Describe(filename).spatialReference
-##
-##
-##
-##            # Check Coordinate system
-##            if sr == out_cs:
-##                print(f"{filename} is already set in {out_cs.name}...")
-##                print(f"Saving to gdb...")
-##                arcpy.FeatureClassToFeatureClass_conversion(filename, scratch_path, name)
-##                messages()
-##            elif sr.name == "Unknown":
-##                print(f"{filename} has unknown spatial reference, exiting...")
-##                exit() #end the program
-##            else:
-##                print(f"{filename} is in {sr.name}, projecting to {out_cs.name}...")
-##                arcpy.Project_management(os.path.join(dirpath, filename), os.path.join(scratch_path, name), out_cs)
-##                messages()
-##
-##
-##            print(f"Clipping to the boundary... ")
-##            arcpy.analysis.Clip(in_features=os.path.join(scratch_path, name), clip_features=study_area, out_feature_class=os.path.join(out_path, name))
-##            messages()
+            name = os.path.splitext(filename)[0]
+
+            sr = arcpy.Describe(filename).spatialReference
+
+            # Check Coordinate system
+            if sr == out_cs:
+                print(f"{filename} is already set in {out_cs.name}. Saving to gdb...")
+                arcpy.FeatureClassToFeatureClass_conversion(filename, scratch_path, name)
+                messages()
+            elif sr.name == "Unknown":
+                print(f"{filename} has unknown spatial reference, exiting...")
+                exit() #end the program
+            else:
+                print(f"{filename} is in {sr.name}, projecting to {out_cs.name}...")
+                arcpy.Project_management(os.path.join(dirpath, filename), os.path.join(scratch_path, name), out_cs)
+                messages()
+
+            print(f"Clipping to the boundary... ")
+            arcpy.analysis.Clip(in_features=os.path.join(scratch_path, name), clip_features=study_area, out_feature_class=os.path.join(out_path, name))
+            messages()
 
         elif filename.lower().endswith(".bnd"):
             rasters = arcpy.ListRasters()
@@ -248,10 +220,7 @@ for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureC
 
                 print("Projecting raster...")
                 out_raster_path = os.path.join(scratch_path, f"{raster}_projected")
-                arcpy.management.ProjectRaster(in_raster=os.path.join(scratch_path, raster),
-                                              out_raster=out_raster_path,
-                                              out_coor_system=out_cs,
-                                              cell_size=cell)
+                arcpy.management.ProjectRaster(in_raster=os.path.join(scratch_path, raster),out_raster=out_raster_path, out_coor_system=out_cs, cell_size=cell)
 
                 print("Extract by Mask with park boundary...")
                 out_extract = ExtractByMask(in_raster=out_raster_path, in_mask_data=study_area)
@@ -260,65 +229,263 @@ for dirpath, dirnames, filenames in arcpy.da.Walk(root_path, datatype=["FeatureC
                 print(f"Saving raster to {out_gdb}...")
                 out_extract.save(os.path.join(out_path, raster))
                 messages()
+
         else:
-            print("\t\t else: hi, how ya doin'? '")
-
-## arcpy.conversion.RasterToOtherFormat(Input_Rasters=os.path.join(dirpath, raster), Output_Workspace=scratch_path, "GRID")
-##
-## arcpy.management.ProjectRaster(in_raster=os.path.join(dirpath, raster), out_raster=os.path.join(scratch_path, raster), out_coor_system=out_cs)
-
-
-##        else:
-##            print("\t\t Not Shapefile")
-##
-##            rasters = arcpy.ListRasters()
-##            for raster in rasters:
-##                print("raster here", raster)
-##
-##            name = os.path.basename(filename)
-##            print(f"\t\t basename {name}")
+            print("\t\t else: hi, how ya doin'? Come here often? ")
 
         print()
 
+# Delete scratch gdb and all intermediate data
+try:
+    print(f"Deleting {scratch_gdb} along with all intermediate data...")
+    arcpy.Delete_management(scratch_path)
+    messages()
+except Exception as e:
+    print(f"Failed to delete {scratch_gdb}: {e}")
+##
+##
+##
+###-------------------------------------------------------------------------------
+### Optimal Routes Parameters
+### Scale ranking from 1 (most desirable) to 10 (least desirable)
+###-------------------------------------------------------------------------------
+##
+##arcpy.env.workspace = out_path
+##
+##
+##
+##
+###-------------------------------------------------------------------------------
+### Landcover - Characteristics of the area being traversed (shp)
+##
+##print("Landcover...")
+##arcpy.conversion.PolygonToRaster(in_features="AB_Landcover", value_field="LC_class", out_rasterdataset="Landcover", cellsize=cell)
+##messages()
+##
+##landcover =arcpy.Raster("Landcover")
+###reclassify the land cover
+##remap = RemapValue([
+##    ['20', 10],
+##    ['31', 8],
+##    ['32', 7],
+##    ['33', 6],
+##    ['34', 10],
+##    ['50', 3],
+##    ['110', 2],
+##    ['120', 9],
+##    ['210', 1],
+##    ['220', 1],
+##    ['230', 1]
+##])
+##
+### Apply reclassification
+##landcover_reclass = Reclassify(landcover, "VALUE", remap, "DATA")
+##messages()
+##
+###save the reclassified land cover
+##landcover_reclass.save("Landcover_Reclass")
+##
+###-------------------------------------------------------------------------------
+### Hydrology, Trails, Roads
+### - Use Distance Accumulation tool (outputs a continuous raster)
+### - Use the Rescale by Function tool to apply a continuous cost value between 0-10
+##
+### Set the environment
+##arcpy.env.extent = study_area # makes sure the rasters cover the whole boundary extent
+##arcpy.env.mask = study_area # makes sure the rasters don't extend beyond the boundary
+##arcpy.env.cellSize = cell # makes sure the rasters are outputted in this cell size
+##
+###-------------------------------------------------------------------------------
+### Hydrology - (desirable)
+##print("Processing Hydrology...")
+##print("Distance Accumulation...")
+##hydro_dist = DistanceAccumulation("Hydro")
+##print("Rescale by Function...")
+##hydro_rescale = RescaleByFunction(hydro_dist, "TfLarge", 10, 0) # close = 1, desirable
+##messages()
+##
+##hydro_rescale.save("Hydro_Rescaled")
+##
+##print("Deleting Hydro Dist...")
+##arcpy.management.Delete(hydro_dist)
+##messages()
+##
+###-------------------------------------------------------------------------------
+### Trails - (avoid)
+##print("Processing Trails...")
+##trails_dist = DistanceAccumulation("Trails")
+##trails_rescale = RescaleByFunction(trails_dist, "TfLarge", 0, 10) # close = 10, undesirable
+##messages()
+##
+##trails_rescale.save("Trails_Rescaled")
+##
+##print("Deleting Trails Dist...")
+##arcpy.management.Delete(trails_dist)
+##messages()
+##
+###-------------------------------------------------------------------------------
+### Road - (avoid)
+### Merge Road and Transportation
+##road_merge = arcpy.management.Merge(["Road", "Transportation"], "Road_Merged")
+##
+##print("Processing Road...")
+##print("Distance Accumulation...")
+##road_dist = DistanceAccumulation(road_merge)
+##print("Rescale by Function...")
+##road_rescale = RescaleByFunction(road_dist, "TfLarge", 0, 10) # close = 10, undesirable
+##messages()
+##
+##road_rescale.save("Road_Rescaled")
+##
+##print("Deleting Road Merged...")
+##arcpy.management.Delete(road_merge)
+##messages()
+##
+##print("Deleting Roads Dist...")
+##arcpy.management.Delete(road_dist)
+##messages()
+##
+##
+##
+###-------------------------------------------------------------------------------
+### Terrain Ruggedness (dem) - (avoid rugged terrain)
+### Rescale by Function
+##
+##dem = arcpy.Raster("ab_dem")
+##
+##print("Terrain ruggedness...")
+##
+### Generate the terrain ruggedness
+##terrainRug = FocalStatistics(dem, NbrRectangle(3,3,"CELL"), "RANGE")
+##messages()
+##
+##terrainRug.save("TerrainR") #save to gdb
+### Use the Rescale By Function to assign the classes to the continuous rasters
+##terrainRug_rescale = RescaleByFunction(terrainRug, "TfLarge", 10, 1)
+##messages()
+##
+##terrainRug_rescale.save("TerrainR_Rescale")
+##
+###-------------------------------------------------------------------------------
+### Combine the cost surfaces into one single cost raster
+### All weights are equal to 1
+##
+##
+###combine all rescaled and reclassified rasters together using weighted sum
+##print("Weight sum...")
+##weighted_sum = WeightedSum(WSTable([[landcover_reclass, 'VALUE', 1], \
+##    [hydro_rescale, 'VALUE', 1], [trails_rescale, 'Value', 1], \
+##    [road_rescale, 'Value', 1], [terrainRug_rescale, 'Value', 1]]))
+##messages()
+##
+###save the weighted sum
+##weighted_sum.save("Combined_Cost")
+##
+###create the routes with the optimal region connections tool
+##print("Computing optimal path...")
+##optimal_routes = OptimalRegionConnections("Bear_Habitat", "Paths", "", weighted_sum)
+##messages()
 
 
+# Delete all reclass and rescale rasters !
 
+#-------------------------------------------------------------------------------
+# Check in the extension
+arcpy.CheckInExtension("Spatial")
 
+#-------------------------------------------------------------------------------
+# Mapping
+#-------------------------------------------------------------------------------
+arcpy.env.workspace = out_path
 
+###reference the aprx document using the mapping modules
+##aprx = MAP.ArcGISProject(r"C:\GEOS456\FinalProject\GEOS456_FinalProject.aprx") #path to aprx doc
+##
+###save a copy of the aprx so we can preserve the original
+##aprx.saveACopy(r"C:\GEOS456\FinalProject\GEOS456_FinalProject_New.aprx")
+##
+###use the mapping module to list map frames and properties
+##print("List map frames and properties: ")
+##maps = aprx.listMaps()
+##for map in maps:
+##    print("Map Name: ", map.name, "|", "Map Type: ", map.mapType)
+##    print()
+##
+###save a specific map frame as a variable to reference in the script
+###access the first map from the list and set the index position to 0
+##m = aprx.listMaps("Map")[0] #Sets the 'map' map to index position 0 within variable m
+##
+###use the mapping module to add layers
+##listFC = arcpy.ListFeatureClasses()
+##listFC = ["KCountry_Bound", "Bear_Habitat", "Paths"]
+##for fc in listFC:
+##    #first step in the loop is to create feature layers form the list
+##    layer = arcpy.MakeFeatureLayer_management(fc)
+##    #next, we will save the feature layers as .lyrx files
+##    lyrFile = arcpy.SaveToLayerFile_management(layer, "C:\\GEOS456\\FinalProject\\" + fc + ".lyrx") #creating a folder to hold the layers
+##    #we then have to use the arcpy.mp.LayerFile function to create another mp module useable layer for some reason
+##    #These layer files are PERMANENT!
+##    lyrFile = MAP.LayerFile(lyrFile)
+##    #so now, we have a layer files that can be added to the map frame
+##    m.addLayer(lyrFile)
+##    print(fc + " layer added.")
+##aprx.save()
+##
+##
+### generate a list of the layouts within the project
+##layout = aprx.listLayouts()[0] # select Bear Habitat layer
+##
+### list the elements contained in the layout
+## # there are LOTS of elements. you'd need to be familiar with them to know to modify them.
+##elements = layout.listElements()
+##for elem in elements:
+##    print(elem.name)
+##    print(elem.type)
+##
+##    # change the map title in the layout
+##    if elem.name == "Map Title":
+##        elem.text = "Connecting Bear"
+##
+##    # change/add a title to the legend element
+##    if elem.name == "Legend":
+##        elem.title = "Legend" ## # will not show since it's not activated
+##
+####m.zoomToAllLayers(True)
+##
+### export the final result to a PDF
+## #layout is the only thing you can export to a PDF. not the APRX
+##layout.exportToPDF(r"C:\GEOS456\FinalProject\GEOS456_FP_Guan_Kristy.pdf")
+##
+##aprx.save()
 
 
 
 
 #-------------------------------------------------------------------------------
-# Criteria
-
-# Terrain (dem)
-##dem = arcpy.Raster("dem")
-
-# Landcover - Characteristics of the area being traversed (shp)
-# clip
+# Grid Statistics
+#-------------------------------------------------------------------------------
+# Average elevation of Kananaskis Country
+# dem?
 
 
-
-# Proximity to existing features/infrastructure (shp)
-# Proximity to hydrology (shp)
-
-# roads, trails, hydrology must be included
+# The area of each landcover type within the park boundary
 
 
+# Use a geometry token to print the total length of the optimal routes
+
+
+
+# Print the NTS and the TWP-TGE-MER that covers the park
 
 
 
 
-
-# Check in the extension
-arcpy.CheckInExtension("Spatial")
 
 #-------------------------------------------------------------------------------
 # Record end time
 end = time.time()
 
 # Print the difference between start and end time in seconds
-print(f"The time to execute the script was {round(end-start, 2)} seconds!")
+print(f"\nThe time to execute the script was {round(end-start, 2)} seconds!")
 
 print("\nEnd of script.")
